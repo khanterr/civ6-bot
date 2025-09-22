@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import fetch from "node-fetch";
 
 const API_KEY = process.env.TELEGRAM_BOT_API_KEY;
 
@@ -45,16 +44,38 @@ const emojies = [
   "🌍","🌏","🗺","🧭","🏔","🌋","🗻","🏕","🏖","🏜","🏝","🏞",
 ];
 
-// in-memory deduplication (resets if function cold-starts)
 const seenTurnSet = new Set();
 
-function stableHash(body) {
-  return crypto.createHash("sha256")
-    .update(JSON.stringify(body))
-    .digest("hex");
+function stableStringify(obj) {
+  if (Array.isArray(obj)) return "[" + obj.map(stableStringify).join(",") + "]";
+  if (obj && typeof obj === "object") {
+    return (
+      "{" +
+      Object.keys(obj)
+        .sort()
+        .map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+        .join(",") +
+      "}"
+    );
+  }
+  return JSON.stringify(obj);
+}
+
+function stableHash(obj) {
+  return crypto.createHash("sha256").update(stableStringify(obj)).digest("hex");
+}
+
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk));
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
 }
 
 async function sendTgMessage(message, chatId) {
+  if (!API_KEY) throw new Error("TELEGRAM_BOT_API_KEY not set");
   const url = `https://api.telegram.org/bot${API_KEY}/sendMessage`;
   const resp = await fetch(url, {
     method: "POST",
@@ -62,43 +83,46 @@ async function sendTgMessage(message, chatId) {
     body: JSON.stringify({
       chat_id: chatId,
       text: message,
-      parse_mode: "Markdown"
+      parse_mode: "Markdown",
     }),
   });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Telegram API error: ${text}`);
-  }
+  const text = await resp.text();
+  if (!resp.ok) throw new Error("Telegram API error: " + text);
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).send("Method Not Allowed");
-  }
+module.exports = async (req, res) => {
+  if (req.method !== "POST") return res.status(405).send("Method Not Allowed");
 
   try {
-    const body = req.body;
+    const raw = await getRawBody(req);
+    let body = {};
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch {
+      return res.status(400).send("Invalid JSON");
+    }
+
+    const { value1, value2, value3 } = body;
+    if (!value1 || !value2 || value3 === undefined) {
+      return res.status(400).send("Missing fields: value1, value2, value3");
+    }
 
     const hash = stableHash(body);
-    if (seenTurnSet.has(hash)) {
-      return res.status(200).send("Received duplicate");
-    }
+    if (seenTurnSet.has(hash)) return res.status(200).send("Received duplicate");
     seenTurnSet.add(hash);
 
     const emoji = emojies[Math.floor(Math.random() * emojies.length)];
-    const nickname = NICKNAME_2_TELEGRAM_USER[body.value2] || body.value2;
-    const notification = `@${nickname}, you get your turn #${body.value3} in game: ${body.value1}! ${emoji}`;
+    const nickname = NICKNAME_2_TELEGRAM_USER[value2] || value2;
+    const notification = `@${nickname}, you get your turn #${value3} in game: ${value1}! ${emoji}`;
+    const chatId = GAME_2_CHAT[value1] || "-1003011585583";
 
-    const chatId = GAME_2_CHAT[body.value1] || "-760003626";
-
-    if (!ignoreGames.has(body.value1)) {
+    if (!ignoreGames.has(value1)) {
       await sendTgMessage(notification, chatId);
     }
 
-    return res.status(200).send("Received");
+    res.status(200).send("Received");
   } catch (err) {
-    console.error(err);
-    return res.status(500).send("Internal Server Error");
+    console.error("Handler error:", err);
+    res.status(500).send("Internal Server Error");
   }
-}
+};
