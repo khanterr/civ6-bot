@@ -83,7 +83,6 @@ async function sendTgMessage(message, chatId) {
     body: JSON.stringify({
       chat_id: chatId,
       text: message,
-      parse_mode: "Markdown",
     }),
   });
   const text = await resp.text();
