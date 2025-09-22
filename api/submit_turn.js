@@ -3,7 +3,7 @@ import crypto from "crypto";
 const API_KEY = process.env.TELEGRAM_BOT_API_KEY;
 
 const GAME_2_CHAT = {
-  test: "-760003626",
+  test: "-4843751665",
   Madlen: "-1001605973535",
   "Mad Mad World": "-1001512980961",
   "Las dosmil y una islas": "-1001937517537",
@@ -20,6 +20,7 @@ const GAME_2_CHAT = {
   Bizcocho: "-1002821093496",
   "Fruta Prohibida": "-1002429758923",
   ahshit: "-1003011585583",
+  "Buarjuan's Game": "-1002941222473"
 };
 
 const NICKNAME_2_TELEGRAM_USER = {
@@ -29,6 +30,8 @@ const NICKNAME_2_TELEGRAM_USER = {
   Cocosus: "MegaCocos",
   ARTURhot: "ArturHot",
   p53: "temoxa_top",
+  "Kenpachi": "Knsr8",
+  "Mito_ka": "mito_kaa",
 };
 
 const ignoreGames = new Set([
@@ -113,7 +116,7 @@ module.exports = async (req, res) => {
     const emoji = emojies[Math.floor(Math.random() * emojies.length)];
     const nickname = NICKNAME_2_TELEGRAM_USER[value2] || value2;
     const notification = `@${nickname}, you get your turn #${value3} in game: ${value1}! ${emoji}`;
-    const chatId = GAME_2_CHAT[value1] || "-1003011585583";
+    const chatId = GAME_2_CHAT[value1] || GAME_2_CHAT["test"];
 
     if (!ignoreGames.has(value1)) {
       await sendTgMessage(notification, chatId);
