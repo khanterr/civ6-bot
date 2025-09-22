@@ -86,7 +86,7 @@ async function sendTgMessage(message, chatId) {
     }),
   });
   const text = await resp.text();
-  if (!resp.ok) throw new Error("Telegram API error: " + text);
+  if (!resp.ok) throw new Error("Telegram API error: " + text + ". Message: " + message);
 }
 
 module.exports = async (req, res) => {
